@@ -1,0 +1,132 @@
+<body></body>
+
+<script>
+let activeEffect
+const effectStack = []
+function effect(fn, options = {}) {
+  const effectFn = () => {
+    activeEffect = effectFn
+    effectStack.push(effectFn)
+    const result = fn()
+    effectStack.pop()
+    activeEffect = effectStack[effectStack.length - 1]
+    return result
+  }
+  effectFn.options = options
+  if (!options.lazy) { // 只有非 lazy 的时候，才执行
+    effectFn()
+  }
+  return effectFn // 返回副作用函数
+}
+
+function isObject(val) {
+  return val && typeof val === 'object'
+}
+
+const bucket = new WeakMap()
+
+function reactive(data) {
+  return new Proxy(data, {
+    get(target, prop, receiver) {
+      const result = Reflect.get(target, prop, receiver)
+      track(target, prop)
+      if (isObject(result)) {
+        return reactive(result)
+      }
+      return result
+    },
+    set(target, prop, newVal, receiver) {
+      const result = Reflect.set(target, prop, newVal, receiver)
+      trigger(target, prop)
+      return result
+    }
+  })
+}
+
+function track(target, prop) {
+  if (!activeEffect) return
+  let depsMap = bucket.get(target)
+  if (!depsMap) {
+    bucket.set(target, (depsMap = new Map()))
+  }
+  let deps = depsMap.get(prop)
+  if (!deps) {
+    depsMap.set(prop, (deps = new Set()))
+  }
+  deps.add(activeEffect) // 收集副作用函数
+}
+function trigger(target, prop) {
+  const depsMap = bucket.get(target)
+  if (!depsMap) return
+  const effects = depsMap.get(prop)
+  effects && effects.forEach(effectFn => {
+    if (effectFn.options.schedular) {
+      // 如果存在调度器
+      effectFn.options.schedular(effectFn)
+    } else {
+      effectFn()
+    }
+  })
+}
+
+function ref(val) {
+  const wrapper = {
+    value: val
+  }
+  // 定义不可枚举的属性 __v_isRef
+  Object.defineProperty(wrapper, '__v_isRef', {
+    value: true
+  })
+  return reactive(wrapper)
+}
+function toRef(obj, prop) {
+  const wrapper = {
+    get value() {
+      return obj[prop]
+    },
+    set value(newVal) {
+      obj[prop] = newVal
+    }
+  }
+  Object.defineProperty(wrapper, '__v_isRef', {
+    value: true
+  })
+  return wrapper
+}
+function toRefs(obj) {
+  const result = {}
+  for (let key in obj) {
+    result[key] = toRef(obj, key)
+  }
+  return result
+}
+
+function proxyRefs(obj) {
+  return new Proxy(obj, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver)
+      return value.__v_isRef ? value.value : value
+    },
+    set(target, prop, newVal, receiver) {
+      const value = Reflect.get(target, prop, receiver)
+      if (value.__v_isRef) {
+        value.value = newVal
+        return true
+      }
+      return Reflect.set(target, prop, newVal, receiver)
+    }
+  })
+}
+
+const obj = reactive({ foo: 1, bar: 2 })
+const msg = ref('hello')
+const setupResult = {
+  msg,
+  ...toRefs(obj)
+}
+const p = proxyRefs(setupResult)
+
+console.log(p.msg) // hello
+console.log(p.foo) // 1
+console.log(p.bar) // 2
+</script>

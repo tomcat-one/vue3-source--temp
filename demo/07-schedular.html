@@ -1,0 +1,70 @@
+<body></body>
+
+<script>
+// 当前注册（激活）的副作用函数
+let activeEffect
+const effectStack = []
+// 用来注册副作用函数
+function effect(fn, options = {}) {
+  fn.options = options
+  activeEffect = fn
+  effectStack.push(fn)
+  fn()
+  effectStack.pop()
+  activeEffect = effectStack[effectStack.length - 1]
+}
+
+const bucket = new WeakMap()
+
+function reactive(data) {
+  return new Proxy(data, {
+    get(target, prop, receiver) {
+      track(target, prop)
+      return Reflect.get(target, prop, receiver)
+    },
+    set(target, prop, newVal, receiver) {
+      const result = Reflect.set(target, prop, newVal, receiver)
+      trigger(target, prop)
+      return result
+    }
+  })
+}
+
+function track(target, prop) {
+  if (!activeEffect) return
+  let depsMap = bucket.get(target)
+  if (!depsMap) {
+    bucket.set(target, (depsMap = new Map()))
+  }
+  let deps = depsMap.get(prop)
+  if (!deps) {
+    depsMap.set(prop, (deps = new Set()))
+  }
+  deps.add(activeEffect) // 收集副作用函数
+}
+function trigger(target, prop) {
+  const depsMap = bucket.get(target)
+  if (!depsMap) return
+  const effects = depsMap.get(prop)
+  effects && effects.forEach(effectFn => {
+    if (effectFn.options.schedular) {
+      // 如果存在调度器
+      effectFn.options.schedular(effectFn)
+    } else {
+      effectFn()
+    }
+  })
+}
+
+const data = { foo: 1 }
+const obj = reactive(data)
+effect(() => {
+  console.log(obj.foo)
+}, {
+  schedular(fn) {
+    setTimeout(fn)
+  }
+})
+obj.foo++
+console.log('结束了')
+</script>

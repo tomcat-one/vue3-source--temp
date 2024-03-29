@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>render function options</title>
+  <script src="./static/mini-vue.umd.js"></script>
+  <style>
+    .demo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .count {
+      margin: 0 15px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { createApp, ref, h, toDisplayString } = MiniVue
+    
+    createApp({
+      setup() {
+        const count = ref(0)
+        const plus = () => {
+          count.value++
+        }
+        const minus = () => {
+          count.value--
+        }
+        return {
+          count,
+          plus,
+          minus
+        }
+      },
+      render(props) {
+        const { count, plus, minus } = props
+        return h('div', { class: 'demo'}, [
+          h('button', { onClick: minus }, '-1'),
+          h('span', { class: 'count' }, String(count)),
+          h('button', { onClick: plus }, '+1')
+        ])
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>

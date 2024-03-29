@@ -1,0 +1,19 @@
+<body></body>
+
+<script src="./static/mini-vue.umd.js"></script>
+
+<script>
+const { parse } = MiniVue
+
+const template = `
+  <div>
+    <p>Template</p>
+  </div>
+`
+const ast = parse(template)
+
+console.log('开始解析:', template)
+console.log(ast)
+console.log(JSON.stringify(ast, null, 2))
+
+</script>
